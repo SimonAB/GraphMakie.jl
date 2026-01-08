@@ -9,6 +9,10 @@ using SimpleTraits
 
 import Makie: DocThemer, ATTRIBUTES, project, automatic
 import DataStructures: DefaultDict, DefaultOrderedDict
+
+# Import Pointf explicitly to silence Julia 1.12's
+# deprecation warning about extending its constructor
+# (triggered by Point{N,Float32} helpers in utils.jl).
 import GeometryBasics: Pointf
 
 include("beziercurves.jl")
