@@ -9,6 +9,7 @@ using SimpleTraits
 
 import Makie: DocThemer, ATTRIBUTES, project, automatic
 import DataStructures: DefaultDict, DefaultOrderedDict
+import GeometryBasics: Pointf
 
 include("beziercurves.jl")
 include("recipes.jl")
