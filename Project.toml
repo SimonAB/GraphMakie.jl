@@ -15,7 +15,6 @@ SimpleTraits = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
-Agents = "1, 2, 3, 4, 5, 6"  # Allow all Agents versions to work around transitive dependency constraints
 CairoMakie = "0.15"
 DataStructures = "0.17, 0.18, 0.19"
 FileIO = "1"
