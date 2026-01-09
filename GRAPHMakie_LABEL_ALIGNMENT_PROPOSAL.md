@@ -30,7 +30,7 @@ graphplot(g,
 **Behavior:**
 - When `nlabels_auto_align = true` and `nlabels` is provided:
   - Automatically computes per-node alignments based on edge geometry
-  - Overrides any user-provided `nlabels_align` (or uses it as fallback for isolated nodes)
+  - For nodes with incident edges, uses automatic alignment instead of any explicitly provided `nlabels_align` (this override is intentional; disable `nlabels_auto_align` to use manual `nlabels_align` values). For isolated nodes, `nlabels_align` is still used as a fallback.
 - When `nlabels_auto_align = false` (default):
   - Uses existing behavior with `nlabels_align`
 - For isolated nodes (no incident edges):
@@ -40,7 +40,7 @@ graphplot(g,
 
 For each node:
 1. Collect angles of all incident edges (both incoming and outgoing)
-2. Normalize angles to [0, 2π] and sort
+2. Normalize angles (in radians) to [0, 2π] and sort
 3. Find the largest angular gap between adjacent edges (including wrap-around)
 4. Place label in the middle of the largest gap
 5. Map the gap midpoint angle to one of 8 alignment directions:
@@ -137,7 +137,7 @@ end
    - Recommendation: Opt-in (`false` by default) for backward compatibility
 
 3. **Performance**: For very large graphs (1000+ nodes), should there be a threshold?
-   - The algorithm is O(E + V log V) per node, which should scale well
+   - The algorithm runs in O(E + V log V) time overall, which should scale well for typical graph sizes
    - Could add a warning or automatic fallback for very large graphs
 
 4. **Customization**: Should users be able to provide a fallback alignment for isolated nodes?
@@ -176,8 +176,8 @@ I'm happy to contribute this as a PR with:
 
 ### References
 
-- Current implementation: [link to our code]
-- Related issues: [if any exist in GraphMakie]
+- Current implementation: see the existing GraphMakie codebase
+- Related issues: None known in GraphMakie at the time of writing
 - Similar features in other libraries: NetworkX, D3.js, Cytoscape
 
 ---

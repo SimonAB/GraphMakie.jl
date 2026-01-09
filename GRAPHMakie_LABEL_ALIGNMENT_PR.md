@@ -32,7 +32,7 @@ For each node:
 1. Collect angles of all incident edges (incoming + outgoing)
 2. Find the largest angular gap between adjacent edges
 3. Place label in the middle of that gap
-4. Map to one of 8 alignment directions (N, NE, E, SE, S, SW, W, NW)
+4. Map to one of 8 alignment directions (East, Northeast, North, Northwest, West, Southwest, South, Southeast)
 
 **Edge cases:**
 - Isolated nodes → use `nlabels_align` default
