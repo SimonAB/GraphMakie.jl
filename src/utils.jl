@@ -1,4 +1,4 @@
-export get_edge_plot, get_arrow_plot, get_node_plot, get_nlabel_plot, get_elabel_plot
+export get_edge_plot, get_arrow_plot, get_node_plot, get_nlabel_plot, get_elabel_plot, compute_auto_label_aligns
 
 "Get the `EdgePlot` subplot from a `GraphPlot`."
 get_edge_plot(gp::GraphPlot) = gp.edge_plot[]
