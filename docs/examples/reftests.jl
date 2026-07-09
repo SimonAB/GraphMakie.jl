@@ -315,3 +315,15 @@ ec[] = Dict(Edge(7,2)=> :green)
 g = complete_graph(4)
 fig,ax,p = graphplot(g; ilabels=["a", "b", "c", "d"], layout=NetworkLayout.Stress(dim=3))
 @save_reference fig
+
+# test i-labels visible after translation
+g = complete_graph(4)
+fig = Figure()
+ax = Axis(fig[1, 1])
+lines!(ax, sin.(0:0.1:10))
+inset_ax = Axis(fig[1, 1]; width=Relative(0.7), height=Relative(0.7), halign=0.5, valign=0.5)
+translate!(inset_ax.blockscene, 0, 0, 150)
+
+graphplot!(inset_ax, g; ilabels=["a", "b", "c", "d"])
+
+@save_reference fig

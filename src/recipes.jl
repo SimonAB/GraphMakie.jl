@@ -259,9 +259,6 @@ function Makie.plot!(gp::GraphPlot)
             gp.ilabels_attr[]...)
         add_constant!(gp.attributes, :ilabels_plot, ilabels_plot) #make plotobj accessible
 
-        # only shift very litte to mess less with 3d plots
-        # translate!(ilabels_plot, 0f32, 0f32, nextfloat(0f32))
-
         map!(gp.attributes, [:ilabels_plot, :ilabels_text, :ilabels_fontsize, :node_size], :node_size_m) do ilp, txt, ilabels_fontsize, node_size
             bbs = Makie.fast_string_boundingboxes(ilp)
             map(enumerate(bbs)) do (i, bb)
