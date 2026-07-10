@@ -279,8 +279,8 @@ end
 end
 
 @testset "test empty edge plot" begin
-    GraphMakie.edgeplot(GraphMakie.Line{Point{2, Float32}}[])
-    GraphMakie.edgeplot(GraphMakie.AbstractPath{Point{2, Float32}}[])
+    GraphMakie.edgeplot(GraphMakie.Line{Point{2, Float32}}[], ())
+    GraphMakie.edgeplot(GraphMakie.AbstractPath{Point{2, Float32}}[], ())
 
     # test empty edge color
     graphplot(SimpleGraph(2); edge_color=Symbol[])
