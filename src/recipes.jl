@@ -309,7 +309,7 @@ function Makie.plot!(gp::GraphPlot)
     # compute initial edge paths; will be adjusted later if arrow_shift = :end
     # create array of paths triggered by node_pos changes
     # in case of a graph change the node_position will change anyway
-    map!(gp.attributes, [:node_pos, :selfedge_size, :selfedge_direction, :selfedge_width, :curve_distance_usage, :curve_distance, :graph], :init_edge_paths) do pos, s, d, w, cdu, cd, g
+    map!(gp.attributes, [:node_pos, :selfedge_size, :selfedge_direction, :selfedge_width, :curve_distance_usage, :curve_distance, :graph], :edge_paths) do pos, s, d, w, cdu, cd, g
         find_edge_paths(g, gp.attributes, pos)
     end
 
@@ -317,9 +317,9 @@ function Makie.plot!(gp::GraphPlot)
         return arrow_show === automatic ? Graphs.is_directed(g) : arrow_show
     end
 
-    # find shifts along initial path that intersect with node marker, short circuits when no shifting is required
+    # find shifts along edge path that intersect with node marker, including arrow size, short circuits when no shifting is required
     map!(gp.attributes,
-         [:graph, :init_edge_paths, :node_pos, :to_px, :node_marker_m, :node_size_m, :node_outset,
+         [:graph, :edge_paths, :node_pos, :to_px, :node_marker_m, :node_size_m, :node_outset,
           :arrow_marker, :arrow_shift, :arrow_size, :arrow_show_m],
          :start_end_shifts
          ) do g, paths, node_pos, tpx, nmarker, nsize, noutset, arrow_marker, arrow_shift, arrow_size,
@@ -328,64 +328,32 @@ function Makie.plot!(gp::GraphPlot)
                                     arrow_shift, arrow_size, arrow_show)
     end
 
-    map!(gp.attributes, [:init_edge_paths, :start_end_shifts, :node_pos], :start_end_positions
-         ) do paths, shifts, np
-        if !isempty(paths)
-            map(paths, shifts) do path, (start_shift, end_shift)
-                return (interpolate(path, start_shift), interpolate(path, end_shift))
-            end
-        else # if no edges return (empty) vector of points, broadcast yields Vector{Any} which can't be plotted
-            Vector{eltype(np)}()
-        end
-    end
-
-    # update edge paths to line up with arrow heads if arrow_shift = :end
-    map!(gp.attributes, [:init_edge_paths, :start_end_positions], :edge_paths
-         ) do paths, start_end_pos
-        map(paths, start_end_pos) do edge_path, (start_pos, end_pos)
-            path_end_adjusted = end_pos != 1.0 ? adjust_endpoint(edge_path, end_pos) : edge_path
-            return start_pos != 0.0 ? adjust_startpoint(path_end_adjusted, start_pos) :
-                   path_end_adjusted
-        end
-    end
-
-    # plot arrow heads
+    # prepare arrow heads
     map!(gp.attributes,
          [:edge_paths, :start_end_shifts, :arrow_shift],
          :arrow_shift_m) do edge_paths, start_end_shifts, arrow_shift
         return update_arrow_shift(edge_paths, start_end_shifts, arrow_shift)
     end
 
-    map!(gp.attributes, [:init_edge_paths, :edge_paths, :start_end_shifts, :arrow_shift_m],
-         :path_shift_combination
-         ) do init_paths, paths, start_end_shifts, arrow_shift_m
-        map(init_paths, paths, start_end_shifts, arrow_shift_m
-            ) do init_path, path, (start_shift, end_shift), shift
-            if start_shift <= shift <= end_shift
-                (path, (shift-start_shift)/(end_shift-start_shift))
-            else
-                (init_path, shift)
-            end
-        end
-    end
 
-    map!(gp.attributes, [:path_shift_combination, :node_pos],
+    map!(gp.attributes, [:edge_paths, :arrow_shift_m, :node_pos],
          :arrow_pos
-         ) do path_shift_combination, np
-        if !isempty(path_shift_combination)
-            map(path_shift_combination) do (path, shift)
+         ) do paths, arrow_shifts, np
+        if !isempty(paths)
+            map(paths, arrow_shifts) do path, shift
                 return interpolate(path, shift)
             end
         else # if no edges return (empty) vector of points, broadcast yields Vector{Any} which can't be plotted
             Vector{eltype(np)}()
         end
     end
+
     map!(gp.attributes,
-         [:path_shift_combination, :to_angle, :arrow_pos], :arrow_rot
-         ) do path_shift_combination, tangle, apos
-        if !isempty(path_shift_combination)
-            angles = map(path_shift_combination, apos) do (path, shift), apos
-                return tangle(path, apos, shift)
+         [:edge_paths, :to_angle, :arrow_shift_m, :arrow_pos], :arrow_rot
+         ) do paths, tangle, arrow_shifts, arrow_positions
+        if !isempty(paths)
+            angles = map(paths, arrow_shifts, arrow_positions) do path, shift, arrow_pos
+                return tangle(path, arrow_pos, shift)
             end
             Billboard(angles)
         else
@@ -407,7 +375,7 @@ function Makie.plot!(gp::GraphPlot)
     end
 
     # actually plot edges
-    edge_plot = edgeplot!(gp, gp[:edge_paths];
+    edge_plot = edgeplot!(gp, gp[:edge_paths], gp[:start_end_shifts];
         color=gp[:edgeplot_color],
         linewidth=gp[:edgeplot_linewidth],
         linestyle=gp[:edgeplot_linestyle],
@@ -758,19 +726,19 @@ function curved_path(p1::PT, p2::PT, curve_distance) where {PT}
     return BezierPath([MoveTo(p1), CurveTo(c1, c2, p2)])
 end
 
-@recipe EdgePlot (paths,) begin
+@recipe EdgePlot (paths,start_end_offsets) begin
     Makie.documented_attributes(Lines)...
 end
 
 function Makie.plot!(p::EdgePlot)
     alllines = eltype(p[:paths][]) <: Line
 
-    map!(p.attributes, :paths, [:points, :ranges]) do paths
+    map!(p.attributes, [:paths, :start_end_offsets], [:points, :ranges]) do paths, start_end_offsets
         PT = ptype(eltype(paths))
         points = PT[]
         ranges = UnitRange{Int}[]
-        for path in paths
-            disc = discretize(path)
+        for (path, (start_offset, end_offset)) in zip(paths, start_end_offsets)
+            disc = discretize(path, start_offset, end_offset)
             pstart = length(points) + 1
             append!(points, disc)
             push!(points, PT(NaN)) # add NaN to separate segments
@@ -937,7 +905,7 @@ function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{PT}}, node_po
             node_size = getattr(node_sizes, j)
             d = distance_between_markers(node_marker, node_size, Circle, 0) + start_outset
             p1 = point_near_offset(edge_paths[i], p0, -d, to_px, 0)
-            inverse_interpolate(edge_paths[i], p1)
+            inverse_interpolate(edge_paths[i], p1, 0.0)
         else
             0.0
         end
@@ -951,30 +919,30 @@ function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{PT}}, node_po
             node_marker = getattr(node_markers, j)
             node_size = getattr(node_sizes, j)
             arrow_marker = getattr(arrow_markers, i)
-            arrow_size = arrow_show ? getattr(arrow_sizes, i) : 0
+            arrow_size = arrow_show && t == :end ? getattr(arrow_sizes, i) : 0
             d = distance_between_markers(node_marker, node_size, arrow_marker, arrow_size) + end_outset
             p1 = point_near_offset(edge_paths[i], p0, d, to_px, 1)
-            inverse_interpolate(edge_paths[i], p1)
+            inverse_interpolate(edge_paths[i], p1, 1.0)
         else
             1.0
         end
 
-        if isnan(start_outset)
+        if isnan(start_shift)
             @warn """
                 Shifting edge start to start-node edge failed.
                 This can happen when the markers are inadequately scaled (e.g., when zooming out too far).
                 Startpoint shift has been reset to 0.0.
             """
-            start_outset = 0.0
+            start_shift = 0.0
         end
 
-        if isnan(end_outset)
+        if isnan(end_shift)
             @warn """
                 Shifting edge end to destination-node edge failed.
                 This can happen when the markers are inadequately scaled (e.g., when zooming out too far).
                 Endpoint shift has been reset to 1.0.
             """
-            end_outset = 1.0
+            end_shift = 1.0
         end
 
         shifts[i] = (start_shift, end_shift)
