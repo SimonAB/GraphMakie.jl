@@ -908,8 +908,8 @@ function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{PT}}, node_po
 
     for (i, e) in enumerate(edges(g))
         # find start shift
-        start_node_outset = getattr(node_outsets, src(e))
-        start_edge_outset = getattr(edge_outsets, i)[1]
+        start_node_outset = getattr(node_outsets, src(e), nothing)
+        start_edge_outset = getattr(edge_outsets, i, (nothing, nothing))[1]
 
         start_outset = sum_if_not_nothing(start_node_outset, start_edge_outset)
 
@@ -927,8 +927,8 @@ function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{PT}}, node_po
 
         # find end shift
         t = getattr(arrow_shifts, i, 0.5)
-        end_node_outset = getattr(node_outsets, dst(e))
-        end_edge_outset = getattr(edge_outsets, i)[2]
+        end_node_outset = getattr(node_outsets, dst(e), nothing)
+        end_edge_outset = getattr(edge_outsets, i, (nothing, nothing))[2]
         end_outset = sum_if_not_nothing(end_node_outset, end_edge_outset)
         end_shift = if !isnothing(end_outset) || t === :end
             end_outset = isnothing(end_outset) ? 0.0 : end_outset
