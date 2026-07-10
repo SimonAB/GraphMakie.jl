@@ -75,11 +75,27 @@ function compare(ref, x)
     return ReferenceTests._psnr(ref, x)
 end
 
+function get_difference(old, new, score_color)
+    a = Makie.ImageBase.norm.(RGB.(load(old)))
+    b = Makie.ImageBase.norm.(RGB.(load(new)))
+
+    diffimage = map(b .- a) do i
+        i = clamp(i, -1, 1)
+        i<0 ? weighted_color_mean(abs(i), RGBf(1,0,0), RGBf(1,1,1)) : weighted_color_mean(i, RGBf(0,1,0), RGBf(1,1,1))
+    end
+    
+    border = 3
+    canvas = fill(score_color, size(diffimage) .+ 2*border)
+    canvas[border+1:end-border, border+1:end-border] .= diffimage
+    canvas
+end
+
 # now test all the generated graphics in the TMPDIR and compare against files in assets dir
 @testset "Reference Tests" begin
     for ass in oldassets
         # skip unresolved conflicts
         occursin(r"\+.png$", ass) && continue
+        occursin(r"\.diff\.png$", ass) && continue
 
         old = joinpath(ASSETS, ass)
         new = joinpath(TMPDIR, ass)
@@ -114,6 +130,11 @@ end
             end
             parts = rsplit(ass, "."; limit=2)
             @assert length(parts) == 2
+
+            diffname = parts[1] * ".diff." *parts[2]
+            diff_image = get_difference(old, new, score > MEH ? RGBf(1,0.7,0) : RGBf(1,0,0))
+            save(joinpath(ASSETS, diffname), diff_image)
+
             newname = parts[1] * "+." *parts[2]
             mv(new, joinpath(ASSETS, newname), force=true)
             @warn "There is a difference in $(ass)! New version moved to $newname. Resolve manually!"
