@@ -906,10 +906,10 @@ function update_arrow_shift(edge_paths::Vector{<:AbstractPath{<:Point3}}, start_
     return arrow_shift
 end
 
-function find_start_end_shift(g, edge_paths::::Vector{<:AbstractPath{<:Point3}}, node_pos, to_px,
+function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{<:Point3}}, node_pos, to_px,
                               node_markers,
                               node_sizes, node_outsets, arrow_markers, arrow_shifts, arrow_sizes,
-                              arrow_show) where {PT}
+                              arrow_show)
     shifts = Vector{Tuple{Float32,Float32}}(undef, ne(g))
     for (i, e) in enumerate(edges(g))
         start_outset = getattr(node_outsets, src(e), 0.0)
