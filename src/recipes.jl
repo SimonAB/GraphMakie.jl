@@ -36,8 +36,8 @@ underlying graph and therefore changing the number of Edges/Nodes.
   Defaults to `scatter_theme.marker` in absence of `ilabels`.
 - `node_strokewidth=automatic`:
   Defaults to `scatter_theme.strokewidth` in absence of `ilabels`.
-- `node_outset=0.0`:
-  Creates a small gap between edges and nodes.
+- `node_outset=nothing`:
+  Creates a small gap between edges and nodes. `nothing`, skips the calcuation. 
 - `node_attr=(;)`: List of kw arguments which gets passed to the `scatter` command
 - `edge_color=lineseg_theme.color`: Color for edges.
 - `edge_width=lineseg_theme.linewidth`: Pass a vector with 2 width per edge to
@@ -47,7 +47,7 @@ underlying graph and therefore changing the number of Edges/Nodes.
   creates separate line plots for each edge rather than combining them into one plot, which may reduce
   performance for graphs with many edges. For optimal performance with large graphs, use homogeneous
   linestyles.
-- `edge_outset=(0.0, 0.0)`:
+- `edge_outset=(nothing, nothing)`:
   Creates a small gap between nodes and the endpoints of the edges. Control the start and end gap separately with tuple `(startgap, endgap)`.
   This parameter is additive to `node_outset`.
 - `edge_attr=(;)`: List of kw arguments which gets passed to the underlying `lines` command used for plotting edges.
@@ -161,13 +161,13 @@ Waypoints along edges:
         node_size = automatic,
         node_marker = automatic,
         node_strokewidth = automatic,
-        node_outset = 0.0,
+        node_outset = nothing,
         node_attr = (;),
         # edge attributes (LineSegements)
         edge_color = lineseg_theme.color,
         edge_width = lineseg_theme.linewidth,
         edge_linestyle = :solid,
-        edge_outset = (0.0, 0.0),
+        edge_outset = (nothing, nothing),
         edge_attr = (;),
         # arrow attributes (Scatter)
         arrow_show = automatic,
@@ -884,15 +884,22 @@ function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{<:Point3}}, n
                               arrow_show)
     shifts = Vector{Tuple{Float32,Float32}}(undef, ne(g))
     for (i, e) in enumerate(edges(g))
-        start_outset = getattr(node_outsets, src(e), 0.0)
-        end_outset = getattr(node_outsets, dst(e), 0.0)
-        start_outset != 0.0 && error("`node_outset != 0.0` not supported for 3D plots.")
-        end_outset != 0.0 && error("`node_outset != 0.0` not supported for 3D plots.")
+        start_node_outset = getattr(node_outsets, src(e), 0.0)
+        end_node_outset = getattr(node_outsets, dst(e), 0.0)
+        start_node_outset != 0.0 && error("`node_outset != 0.0` not supported for 3D plots.")
+        end_node_outset != 0.0 && error("`node_outset != 0.0` not supported for 3D plots.")
+
+        start_edge_outset = getattr(edge_outsets, i)[1]
+        end_edge_outset = getattr(edge_outsets, i)[2]
+        (!isnothing(start_edge_outset) || start_edge_outset != 0.0) && error("`edge_outset != (0.0,0.0)` not supported for 3D plots.")
+        (!isnothing(end_edge_outset) || end_edge_outset != 0.0) && error("`edge_outset != (0.0,0.0)` not supported for 3D plots.")
 
         shifts[i] = (0.0, 1.0)
     end
     return shifts
 end
+
+sum_if_not_nothing(a, b) = isnothing(a) ? b : isnothing(b) ? a : a + b
 
 function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{PT}}, node_pos, to_px, node_markers,
                               node_sizes, node_outsets, edge_outsets, arrow_markers, arrow_shifts, arrow_sizes,
@@ -901,10 +908,12 @@ function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{PT}}, node_po
 
     for (i, e) in enumerate(edges(g))
         # find start shift
-        start_node_outset = getattr(node_outsets, src(e), 0.0)
-        start_edge_outset = getattr(edge_outsets, i, (0.0, 0.0))[1]
-        start_outset = start_node_outset + start_edge_outset
-        start_shift = if start_outset != 0.0
+        start_node_outset = getattr(node_outsets, src(e))
+        start_edge_outset = getattr(edge_outsets, i)[1]
+
+        start_outset = sum_if_not_nothing(start_node_outset, start_edge_outset)
+
+        start_shift = if !isnothing(start_outset)
             j = src(e)
             p0 = getattr(node_pos, j)
             node_marker = getattr(node_markers, j)
@@ -918,10 +927,12 @@ function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{PT}}, node_po
 
         # find end shift
         t = getattr(arrow_shifts, i, 0.5)
-        end_node_outset = getattr(node_outsets, dst(e), 0.0)
-        end_edge_outset = getattr(edge_outsets, i, (0.0, 0.0))[2]
-        end_outset = end_node_outset + end_edge_outset
-        end_shift = if end_outset != 0.0 || t === :end
+        end_node_outset = getattr(node_outsets, dst(e))
+        end_edge_outset = getattr(edge_outsets, i)[2]
+        end_outset = sum_if_not_nothing(end_node_outset, end_edge_outset)
+        end_shift = if !isnothing(end_outset) || t === :end
+            end_outset = isnothing(end_outset) ? 0.0 : end_outset
+
             j = dst(e)
             p0 = getattr(node_pos, j)
             node_marker = getattr(node_markers, j)
