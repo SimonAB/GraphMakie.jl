@@ -1,9 +1,10 @@
 using GraphMakie
 using Documenter
 using Literate
-using CairoMakie
 
 # preload the deps from the examples to supress precompilation output in docs
+using WGLMakie
+using CairoMakie
 using NetworkDynamics
 using LayeredLayouts
 using Graphs
