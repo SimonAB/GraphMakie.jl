@@ -131,7 +131,7 @@ end
             parts = rsplit(ass, "."; limit=2)
             @assert length(parts) == 2
 
-            diffname = parts[1] * ".diff." *parts[2]
+            diffname = parts[1] * ".diff." * parts[2]
             diff_image = get_difference(old, new, score > MEH ? RGBf(1,0.7,0) : RGBf(1,0,0))
             save(joinpath(ASSETS, diffname), diff_image)
 

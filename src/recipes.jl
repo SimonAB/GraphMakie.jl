@@ -895,8 +895,8 @@ function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{<:Point3}}, n
 
         start_edge_outset = getattr(edge_outsets, i)[1]
         end_edge_outset = getattr(edge_outsets, i)[2]
-        (!isnothing(start_edge_outset) || start_edge_outset != 0.0) && error("`edge_outset != (0.0,0.0)` not supported for 3D plots.")
-        (!isnothing(end_edge_outset) || end_edge_outset != 0.0) && error("`edge_outset != (0.0,0.0)` not supported for 3D plots.")
+        (!isnothing(start_edge_outset) && start_edge_outset != 0.0) && error("`edge_outset != (0.0,0.0)` not supported for 3D plots.")
+        (!isnothing(end_edge_outset) && end_edge_outset != 0.0) && error("`edge_outset != (0.0,0.0)` not supported for 3D plots.")
 
         shifts[i] = (0.0, 1.0)
     end
