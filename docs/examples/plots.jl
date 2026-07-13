@@ -302,6 +302,41 @@ hidedecorations!(ax); hidespines!(ax); ax.aspect = DataAspect()
 @save_reference f #hide
 
 #=
+## Controlling the endpoints of edges with `node_outset` and `edge_outset`
+To create a small gap between each node and all connected edges, use the `node_outset` parameter.
+Use a single number to set the same outset for all nodes, a dictionary indexed by (some) node indices to set the outset
+for some nodes, or a vector of length `nv(g)` to set an individual outset for every node in the graph:
+=#
+set_theme!(size=(800, 400)) #hide
+f = Figure(); ax = Axis(f[1,1]); ax2 = Axis(f[1,2])
+hidedecorations!(ax); hidespines!(ax); ax.aspect = DataAspect(); limits!(ax, -1.6, 1.3, -2.3,0.6)
+hidedecorations!(ax2); hidespines!(ax2); ax2.aspect = DataAspect(); limits!(ax2, -1.6, 1.3, -2.3,0.6)
+
+g = complete_digraph(3)
+graphplot!(ax, g; node_outset = 20, curve_distance=0.3, arrow_size=20)
+graphplot!(ax2, g; node_outset = [10,30,60], ilabels=["small\noutset", "medium\noutset", "large\noutset"], arrow_shift=:end, curve_distance=0.3, arrow_size=20)
+@save_reference f #hide
+
+#=
+Similarly, the `edge_outset` parameter can be used to create a gap between each ends of the edges and the nodes.
+Use a tuple of `(start_outset, end_outset)` for a single value for all edges, a dictionary indexed by (some) edge
+indices to set the outset for some edges or a vector of length `ne(g)` to set the individual outsets for every edge in the graph:
+=#
+set_theme!(size=(800, 400)) #hide
+f = Figure(); ax = Axis(f[1,1]); ax2 = Axis(f[1,2])
+hidedecorations!(ax); hidespines!(ax); ax.aspect = DataAspect(); limits!(ax, -1.5, 1.3, -2.2,0.5)
+hidedecorations!(ax2); hidespines!(ax2); ax2.aspect = DataAspect(); limits!(ax2, -1.5, 1.3, -2.2,0.5)
+
+g = complete_digraph(3)
+p = graphplot!(ax, g; edge_outset = (40, 10), curve_distance=0.3, arrow_size=20)
+p = graphplot!(ax2, g; edge_outset = Dict(1 => (10, 40), 2 => (40, 20), 3=>(nothing, 10)), node_size=50, curve_distance=0.3, arrow_size=20)
+@save_reference f #hide
+
+#=
+Combining `node_outset` and `edge_outset` is possible and will apply the sum of the applicable outsets to each edges start and end.
+=#
+
+#=
 ## Plot Graphs in 3D
 If the layout returns points in 3 dimensions, the plot will be in 3D. However this is a bit
 experimental. Feel free to file an issue if there are any problems.

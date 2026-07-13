@@ -224,13 +224,13 @@ function distance_between_markers(marker1, size1, marker2, size2)
 end
 
 """
-    point_near_dst(edge_path, p0::PT, d, to_px) where {PT}
+    point_near_offset(edge_path, p0::PT, d, to_px, offset) where {PT}
 
-Find point near destination node along `edge_path` a 
+Find point near the `offset ∈ [0, 1]` along `edge_path` a 
 distance `d` pixels along the tangent line.
 """
-function point_near_dst(edge_path, p0::PT, d, to_px) where {PT}
-    pt = tangent(edge_path, 1) #edge tangent at dst node
+function point_near_offset(edge_path, p0::PT, d, to_px, offset) where {PT}
+    pt = tangent(edge_path, offset) #edge tangent along path
     r = to_px(pt) - to_px(PT(0)) #direction vector in pixels
     scale_px = 1 ./ (to_px(PT(1)) - to_px(PT(0)))
     p1 = p0 - d*normalize(r)*scale_px
