@@ -742,6 +742,8 @@ function Makie.plot!(p::EdgePlot)
     alllines = eltype(p[:paths][]) <: Line
 
     map!(p.attributes, [:paths, :start_end_offsets], [:points, :ranges]) do paths, start_end_offsets
+        @assert length(paths) == length(start_end_offsets) "`paths` and `offsets` must have the same length!"
+
         PT = ptype(eltype(paths))
         points = PT[]
         ranges = UnitRange{Int}[]
@@ -890,13 +892,13 @@ function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{<:Point3}}, n
     for (i, e) in enumerate(edges(g))
         start_node_outset = getattr(node_outsets, src(e), 0.0)
         end_node_outset = getattr(node_outsets, dst(e), 0.0)
-        start_node_outset != 0.0 && error("`node_outset != 0.0` not supported for 3D plots.")
-        end_node_outset != 0.0 && error("`node_outset != 0.0` not supported for 3D plots.")
+        !isnothing(start_node_outset) && start_node_outset != 0.0 && error("`node_outset != 0.0` not supported for 3D plots.")
+        !isnothing(end_node_outset) && end_node_outset != 0.0 && error("`node_outset != 0.0` not supported for 3D plots.")
 
-        start_edge_outset = getattr(edge_outsets, i)[1]
-        end_edge_outset = getattr(edge_outsets, i)[2]
-        (!isnothing(start_edge_outset) && start_edge_outset != 0.0) && error("`edge_outset != (0.0,0.0)` not supported for 3D plots.")
-        (!isnothing(end_edge_outset) && end_edge_outset != 0.0) && error("`edge_outset != (0.0,0.0)` not supported for 3D plots.")
+        start_edge_outset = getattr(edge_outsets, i, (0.0, 0.0))[1]
+        end_edge_outset = getattr(edge_outsets, i, (0.0, 0.0))[2]
+        (!isnothing(start_edge_outset) && start_edge_outset != 0.0) && error("`edge_outset != (0.0, 0.0)` not supported for 3D plots.")
+        (!isnothing(end_edge_outset) && end_edge_outset != 0.0) && error("`edge_outset != (0.0, 0.0)` not supported for 3D plots.")
 
         shifts[i] = (0.0, 1.0)
     end
@@ -966,6 +968,11 @@ function find_start_end_shift(g, edge_paths::Vector{<:AbstractPath{PT}}, node_po
                 Endpoint shift has been reset to 1.0.
             """
             end_shift = 1.0
+        end
+
+
+        if start_shift >= end_shift
+            start_shift = end_shift = 0.5
         end
 
         shifts[i] = (start_shift, end_shift)

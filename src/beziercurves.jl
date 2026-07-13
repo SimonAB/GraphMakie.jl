@@ -105,7 +105,7 @@ function inverse_interpolate(p::BezierPath{<:Point2}, pt, towards=1.0)
             return NaN
         else
             t = ((seg_id-1) .+ tseg) ./ N  # map back to full path interpolation value
-            return argmin(ti -> abs(ti - towards), t)  # find the value closest
+            return argmin(ti -> abs(ti - towards), t)  # find the value closest to `towards`
         end
     end
     if all(isnan, ts)
@@ -119,7 +119,7 @@ function inverse_interpolate(l::Line{PT}, pt, _=1.0) where PT
     a = l.p0 - pt
     b = l.p - l.p0
     t = -(a[1]*b[1] + a[2]*b[2]) / (b[1]^2 + b[2]^2)
-    return t
+    return clamp(t, 0.0, 1.0)
 end
 
 function inverse_interpolate(p, pt::Point3, _=1.0)
@@ -139,7 +139,7 @@ function _inverse_interpolate(c::CurveTo{<:Point2}, p0, pt)
     poly5 = p0[1]^2 - 6*p0[1]*p1[1] + 6*p0[1]*p2[1] - 2*p0[1]*p3[1] + p0[2]^2 - 6*p0[2]*p1[2] + 6*p0[2]*p2[2] - 2*p0[2]*p3[2] + 9*p1[1]^2 - 18*p1[1]*p2[1] + 6*p1[1]*p3[1] + 9*p1[2]^2 - 18*p1[2]*p2[2] + 6*p1[2]*p3[2] + 9*p2[1]^2 - 6*p2[1]*p3[1] + 9*p2[2]^2 - 6*p2[2]*p3[2] + p3[1]^2 + p3[2]^2
     t_vals = roots5([poly0, poly1, poly2, poly3, poly4, poly5]) #get roots
     t_reals = filter(i -> isreal(i), round.(t_vals, digits=6)) #get reals (round to 6 digits)
-    return real.(t_reals)
+    return clamp.(real.(t_reals), 0.0, 1.0)
 end
 
 """
@@ -155,7 +155,7 @@ end
 tangent(l::Line, _) = normalize(l.p - l.p0)
 
 """
-    discretize(path::AbstractPath)
+    discretize(path::AbstractPath, start_offset=0.0, end_offset=1.0)
 
 Return vector of points which represent the given `path`.
 """
@@ -173,9 +173,8 @@ function discretize(path::BezierPath{T}, start_offset=0.0, end_offset=1.0) where
         eo = i==length(cropped_commands) ? end_segment_offset : 1.0
         _discretize!(v, c, p0, so, eo)
         p0 = c.p
-        # push!(v, T(0,0))
-        # push!(v, v[end-1])
     end
+
     return v
 end
 
