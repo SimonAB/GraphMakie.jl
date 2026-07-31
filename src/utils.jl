@@ -194,7 +194,7 @@ function scale_factor(marker::Symbol)
     size_factor = 0.75 #Makie.default_marker_map() has all markers scaled by 0.75
     if marker == :circle #BezierCircle
         r = 0.47
-    elseif marker in [:rect, :diamond, :vline, :hline] #BezierSquare
+    elseif marker in [:rect, :rrect, :diamond, :vline, :hline] #BezierSquare / rounded rect
         rmarker = 0.95*sqrt(pi)/2/2
         r = sqrt(2*rmarker^2) #pithagoras to get radius of circle that circumscribes marker
     elseif marker in [:utriangle, :dtriangle, :ltriangle, :rtriangle] #Bezier Triangles
@@ -214,13 +214,27 @@ end
 Calculate distance between 2 markers.
 TODO: Implement for noncircular marker1.
       (will require angle for line joining the 2 markers).
+
+`size1` / `size2` may be scalars or `(width, height)` / `Vec2` marker sizes;
+non-scalar sizes use the larger axis (circumscribed extent).
 """
 function distance_between_markers(marker1, size1, marker2, size2)
     marker1_scale = scale_factor(marker1)
     marker2_scale = scale_factor(marker2)
-    d = marker1_scale*size1/2 + marker2_scale*size2/2
+    d = marker1_scale * _marker_size_extent(size1) / 2 +
+        marker2_scale * _marker_size_extent(size2) / 2
 
     return d
+end
+
+"""Largest pixel extent of a marker size (scalar or 2-vector / tuple)."""
+_marker_size_extent(size::Real) = Float64(size)
+_marker_size_extent(size::Tuple{<:Real, <:Real}) = Float64(max(size[1], size[2]))
+function _marker_size_extent(size)
+    if applicable(length, size) && length(size) >= 2
+        return Float64(max(size[1], size[2]))
+    end
+    return Float64(size)
 end
 
 """
