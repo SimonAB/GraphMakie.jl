@@ -214,11 +214,15 @@ end
 Calculate distance between 2 markers.
 TODO: Implement for noncircular marker1.
       (will require angle for line joining the 2 markers).
+
+`size1` / `size2` may be scalars or `(width, height)` / `Vec2` marker sizes;
+non-scalar sizes use `maximum` (larger axis / circumscribed extent).
 """
 function distance_between_markers(marker1, size1, marker2, size2)
     marker1_scale = scale_factor(marker1)
     marker2_scale = scale_factor(marker2)
-    d = marker1_scale*size1/2 + marker2_scale*size2/2
+    d = marker1_scale * maximum(size1) / 2 +
+        marker2_scale * maximum(size2) / 2
 
     return d
 end

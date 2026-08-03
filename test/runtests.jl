@@ -165,6 +165,22 @@ end
     # graphplot(g; nlabels, nlabels_align, nlabels_distance=20)
 end
 
+@testset "distance_between_markers" begin
+    using GraphMakie: distance_between_markers, scale_factor
+    using GeometryBasics: Vec2
+
+    d_scalar = distance_between_markers(:circle, 34, '➤', 14)
+    @test d_scalar ≈ scale_factor(:circle) * 34 / 2 + scale_factor('➤') * 14 / 2
+
+    # Rectangular node sizes: use the larger axis (same as maximum)
+    d_tuple = distance_between_markers(:rect, (132, 84), '➤', 14)
+    @test d_tuple ≈ scale_factor(:rect) * 132 / 2 + scale_factor('➤') * 14 / 2
+    @test d_tuple ≈ distance_between_markers(:rect, 132, '➤', 14)
+
+    d_vec = distance_between_markers(:rect, Vec2(105.0, 80.0), '➤', 14)
+    @test d_vec ≈ distance_between_markers(:rect, 105.0, '➤', 14)
+end
+
 @testset "test plot accessors" begin
     g = complete_graph(10)
     nlabels = repr.(1:nv(g))
