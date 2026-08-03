@@ -3,10 +3,13 @@
 # Honest comparison: package default align `(:left, :bottom)` vs auto-align,
 # with the same `nlabels_distance`. Cases where a single fixed align sits on edges.
 #
-# Local only until authorised to push / post.
+# Kept outside `docs/examples/` so Literate/Documenter do not execute it.
+#
+# From the GraphMakie.jl repo root:
+#   julia --project=/path/to/env --threads=auto -e 'include("docs/nlabels_auto_align_demo.jl")'
 
 using Pkg
-const REPO = dirname(dirname(@__DIR__))
+const REPO = dirname(@__DIR__)
 if !isdefined(Main, :GraphMakie) || !isdefined(Main, :CairoMakie)
     try
         @eval using GraphMakie
@@ -26,7 +29,7 @@ end
 
 CairoMakie.activate!(type = "png", px_per_unit = 2)
 
-const OUTDIR = joinpath(REPO, "docs", "src", "assets")
+const OUTDIR = joinpath(@__DIR__, "src", "assets")
 const TMPDIR = mktempdir()
 mkpath(OUTDIR)
 
