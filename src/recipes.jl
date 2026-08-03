@@ -446,14 +446,6 @@ function Makie.plot!(gp::GraphPlot)
             end
         end
 
-        map!(gp.attributes, [:nlabels_align, :nlabels_distance], :nlabels_offset_processed) do align, distance
-            if align isa Vector
-                distance .* align_to_dir.(align)
-            else
-                distance .* align_to_dir(align)
-            end
-        end
-
         # prepare node labels attributes
         map!(gp.attributes, [:nlabels, :graph], :nlabels_text_processed) do labels, graph
             prep_vertex_attributes(labels, graph, "")
@@ -485,6 +477,16 @@ function Makie.plot!(gp::GraphPlot)
                 auto_aligns
             else
                 prep_vertex_attributes(user_align, graph, dfth.nlabels_align[])
+            end
+        end
+
+        # Distance offset must follow the *processed* alignment (auto or user),
+        # otherwise auto-align anchors and pixel offsets disagree.
+        map!(gp.attributes, [:nlabels_align_processed, :nlabels_distance], :nlabels_offset_processed) do align, distance
+            if align isa Vector
+                distance .* align_to_dir.(align)
+            else
+                distance .* align_to_dir(align)
             end
         end
 
