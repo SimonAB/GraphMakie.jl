@@ -1,4 +1,4 @@
-export get_edge_plot, get_arrow_plot, get_node_plot, get_nlabel_plot, get_elabel_plot, compute_auto_label_aligns
+export get_edge_plot, get_arrow_plot, get_node_plot, get_nlabel_plot, get_elabel_plot
 
 "Get the `EdgePlot` subplot from a `GraphPlot`."
 get_edge_plot(gp::GraphPlot) = gp.edge_plot[]
@@ -194,7 +194,7 @@ function scale_factor(marker::Symbol)
     size_factor = 0.75 #Makie.default_marker_map() has all markers scaled by 0.75
     if marker == :circle #BezierCircle
         r = 0.47
-    elseif marker in [:rect, :rrect, :diamond, :vline, :hline] #BezierSquare / rounded rect
+    elseif marker in [:rect, :diamond, :vline, :hline] #BezierSquare
         rmarker = 0.95*sqrt(pi)/2/2
         r = sqrt(2*rmarker^2) #pithagoras to get radius of circle that circumscribes marker
     elseif marker in [:utriangle, :dtriangle, :ltriangle, :rtriangle] #Bezier Triangles
@@ -216,156 +216,28 @@ TODO: Implement for noncircular marker1.
       (will require angle for line joining the 2 markers).
 
 `size1` / `size2` may be scalars or `(width, height)` / `Vec2` marker sizes;
-non-scalar sizes use the larger axis (circumscribed extent).
+non-scalar sizes use `maximum` (larger axis / circumscribed extent).
 """
 function distance_between_markers(marker1, size1, marker2, size2)
     marker1_scale = scale_factor(marker1)
     marker2_scale = scale_factor(marker2)
-    d = marker1_scale * _marker_size_extent(size1) / 2 +
-        marker2_scale * _marker_size_extent(size2) / 2
+    d = marker1_scale * maximum(size1) / 2 +
+        marker2_scale * maximum(size2) / 2
 
     return d
 end
 
-"""Largest pixel extent of a marker size (scalar or 2-vector / tuple)."""
-_marker_size_extent(size::Real) = Float64(size)
-_marker_size_extent(size::Tuple{<:Real, <:Real}) = Float64(max(size[1], size[2]))
-function _marker_size_extent(size)
-    if applicable(length, size) && length(size) >= 2
-        return Float64(max(size[1], size[2]))
-    end
-    return Float64(size)
-end
-
 """
-    point_near_dst(edge_path, p0::PT, d, to_px) where {PT}
+    point_near_offset(edge_path, p0::PT, d, to_px, offset) where {PT}
 
-Find point near destination node along `edge_path` a 
+Find point near the `offset ∈ [0, 1]` along `edge_path` a 
 distance `d` pixels along the tangent line.
 """
-function point_near_dst(edge_path, p0::PT, d, to_px) where {PT}
-    pt = tangent(edge_path, 1) #edge tangent at dst node
+function point_near_offset(edge_path, p0::PT, d, to_px, offset) where {PT}
+    pt = tangent(edge_path, offset) #edge tangent along path
     r = to_px(pt) - to_px(PT(0)) #direction vector in pixels
     scale_px = 1 ./ (to_px(PT(1)) - to_px(PT(0)))
     p1 = p0 - d*normalize(r)*scale_px
 
     return p1
-end
-
-"""
-    compute_auto_label_aligns(g::AbstractGraph, node_positions::AbstractVector)
-
-Compute optimal label alignment for each node to avoid edge overlaps.
-
-For each node, finds the largest angular gap between incident edges and places
-the label in the middle of that gap.
-
-# Arguments
-- `g`: An `AbstractGraph` from Graphs.jl
-- `node_positions`: Vector of node positions (Point2f or similar)
-
-# Returns
-- Vector of `(:horizontal, :vertical)` tuples for `nlabels_align`
-
-# Notes
-- For isolated nodes (no incident edges), returns `(:right, :bottom)` as default
-- Works with both directed and undirected graphs
-- Accounts for both incoming and outgoing edges
-"""
-function compute_auto_label_aligns(g::AbstractGraph, node_positions::AbstractVector)
-    n = nv(g)
-    aligns = Vector{Tuple{Symbol, Symbol}}(undef, n)
-    
-    for node in 1:n
-        node_pos = node_positions[node]
-        edge_angles = Float64[]
-        
-        # Collect angles of ALL incident edges (both incoming and outgoing)
-        # For incoming edges: direction FROM node TO source
-        # For outgoing edges: direction FROM node TO destination
-        for src in 1:n
-            if has_edge(g, src, node)  # Incoming edge
-                src_pos = node_positions[src]
-                dx = Float64(src_pos[1] - node_pos[1])
-                dy = Float64(src_pos[2] - node_pos[2])
-                push!(edge_angles, atan(dy, dx))
-            end
-        end
-        for dst in 1:n
-            if has_edge(g, node, dst)  # Outgoing edge
-                dst_pos = node_positions[dst]
-                dx = Float64(dst_pos[1] - node_pos[1])
-                dy = Float64(dst_pos[2] - node_pos[2])
-                push!(edge_angles, atan(dy, dx))
-            end
-        end
-        
-        # Default alignment for isolated nodes
-        if isempty(edge_angles)
-            aligns[node] = (:right, :bottom)
-            continue
-        end
-        
-        # Find the largest angular gap between adjacent edges
-        # Normalize angles (in radians) to [0, 2π] and sort
-        angles_norm = sort([mod(a + 2π, 2π) for a in edge_angles])
-        
-        # Find gaps between adjacent angles (including wrap-around gap)
-        best_gap = 0.0
-        best_midpoint = -π/4  # Default: Southeast (bottom-right)
-        
-        for i in 1:length(angles_norm)
-            next_i = i == length(angles_norm) ? 1 : i + 1
-            # Gap from angles_norm[i] to angles_norm[next_i]
-            if next_i == 1
-                # Wrap-around gap
-                gap = (2π - angles_norm[i]) + angles_norm[1]
-                midpoint = angles_norm[i] + gap / 2
-                if midpoint > π
-                    midpoint -= 2π
-                end
-            else
-                gap = angles_norm[next_i] - angles_norm[i]
-                midpoint = angles_norm[i] + gap / 2
-            end
-            
-            if gap > best_gap
-                best_gap = gap
-                best_midpoint = midpoint
-            end
-        end
-        
-        # Convert best_midpoint angle to alignment
-        # Normalize to [0, 2π]
-        angle = mod(best_midpoint + 2π, 2π)
-        
-        # Map angle to alignment (8 directions)
-        # Each sector spans π/4 (45°), centered on cardinal/ordinal directions
-        # Sector boundaries: 0=E, π/4=NE, π/2=N, 3π/4=NW, π=W, 5π/4=SW, 3π/2=S, 7π/4=SE
-        #
-        # IMPORTANT: Alignment semantics in Makie:
-        # - (:left, :center) means label's LEFT edge at anchor → label extends RIGHT (East)
-        # - (:right, :center) means label's RIGHT edge at anchor → label extends LEFT (West)
-        # - (:center, :bottom) means label's BOTTOM at anchor → label extends UP (North)
-        # - (:center, :top) means label's TOP at anchor → label extends DOWN (South)
-        aligns[node] = if angle < π/8 || angle >= 15π/8
-            (:left, :center)       # Label to East (right of node)
-        elseif angle < 3π/8
-            (:left, :bottom)       # Label to Northeast
-        elseif angle < 5π/8
-            (:center, :bottom)     # Label to North (above node)
-        elseif angle < 7π/8
-            (:right, :bottom)      # Label to Northwest
-        elseif angle < 9π/8
-            (:right, :center)      # Label to West (left of node)
-        elseif angle < 11π/8
-            (:right, :top)         # Label to Southwest
-        elseif angle < 13π/8
-            (:center, :top)        # Label to South (below node)
-        else
-            (:left, :top)          # Label to Southeast
-        end
-    end
-    
-    return aligns
 end

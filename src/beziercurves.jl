@@ -44,20 +44,18 @@ ptype(::Union{AbstractPath{PT}, Type{<:AbstractPath{PT}}}) where {PT} = PT
 straighten(l::Line) = l
 straighten(p::BezierPath) = Line(interpolate(p,0.0), interpolate(p,1.0))
 
-adjust_endpoint(l::Line, p) = Line(l.p0, p)
-adjust_endpoint(::MoveTo, p) = MoveTo(p)
-adjust_endpoint(::LineTo, p) = LineTo(p)
-adjust_endpoint(c::CurveTo, p) = CurveTo(c.c1, c.c2, p)
-
-function adjust_endpoint(path::BezierPath, p)
-    commands = copy(path.commands)
-    commands[end] = adjust_endpoint(commands[end], p)
-    BezierPath(commands)
-end
-
 ####
 #### Helper functions to work with bezier paths
 ####
+
+function interpolation_startpoint_segmentid_offset(p::BezierPath{PT}, t) where {PT}
+    @assert p.commands[begin] isa MoveTo
+    N = length(p.commands) - 1
+
+    tn = N*t
+    seg = max(0, min(floor(Int, tn), N-1))
+    return p.commands[seg+1].p, seg, tn - seg
+end
 
 """
     interpolate(p::AbstractPath, t)
@@ -67,23 +65,18 @@ Parametrize path `p` from `t ∈ [0, 1]`. Return position at `t`.
 TODO: Points are not necessarily evenly spaced!
 """
 function interpolate(p::BezierPath{PT}, t) where PT
-    @assert p.commands[begin] isa MoveTo
-    N = length(p.commands) - 1
+    (p0, seg, tseg) = interpolation_startpoint_segmentid_offset(p, t)
 
-    tn = N*t
-    seg = max(0, min(floor(Int, tn), N-1))
-    tseg = tn - seg
-
-    p0 = p.commands[seg+1].p
     return _interpolate(p.commands[seg+2], p0, tseg)
 end
 
 interpolate(l::Line{PT}, t) where PT = l.p0 + t*(l.p - l.p0) |> PT
 
 """
-    inverse_interpolate(p, pt)
+    inverse_interpolate(p, pt, towards=1.0)
 
-Find interpolation point `t ∈ [0, 1]` for the point along `p` that is closest to `pt`.
+Find interpolation point `t ∈ [0, 1]` for the point along `p` that is closest to `pt`. In case there are multiple points,
+    the one closest to `towards ∈ [0, 1]` is returned.
 
 Method: Calculates the square distance between `pt` and path `p` and minimizes (takes first derivative, equates to 0 and finds roots)
 
@@ -101,28 +94,35 @@ Method: Calculates the square distance between `pt` and path `p` and minimizes (
     let a = p0 - pt, b = p - p0
     t = -(a[1]*b[1] + a[2]*b[2]) / (b[1]^2 + b[2]^2)
 """
-function inverse_interpolate(p::BezierPath{<:Point2}, pt)
-    p0 = p.commands[end-1].p
-    c = p.commands[end]
+function inverse_interpolate(p::BezierPath{<:Point2}, pt, towards=1.0)
     N = length(p.commands) - 1
-    tseg = _inverse_interpolate(c, p0, pt) #get interpolation value closest to pt
-    if isempty(tseg)
-        t = NaN
-    else
-        _, tloc = findmin((tseg .- 1).^2) #find the value closest to 1
-        t = ((N-1) + tseg[tloc]) / N
+
+    ts = map(1:N, p.commands[1:end-1], p.commands[2:end]) do seg_id, c1, c2
+        p0 = c1.p
+        tseg = _inverse_interpolate(c2, p0, pt) #get interpolation value closest to pt on the current segment
+
+        if isempty(tseg)
+            return NaN
+        else
+            t = ((seg_id-1) .+ tseg) ./ N  # map back to full path interpolation value
+            return argmin(ti -> abs(ti - towards), t)  # find the value closest to `towards`
+        end
     end
-    return t
+    if all(isnan, ts)
+        return NaN
+    else
+        return argmin(ti -> norm(interpolate(p, ti) - pt), filter(!isnan, ts))
+    end
 end
 
-function inverse_interpolate(l::Line{PT}, pt) where PT
+function inverse_interpolate(l::Line{PT}, pt, _=1.0) where PT
     a = l.p0 - pt
     b = l.p - l.p0
     t = -(a[1]*b[1] + a[2]*b[2]) / (b[1]^2 + b[2]^2)
-    return t
+    return clamp(t, 0.0, 1.0)
 end
 
-function inverse_interpolate(p, pt::Point3)
+function inverse_interpolate(p, pt::Point3, _=1.0)
     # TODO: is this the right place to throw an error when trying to shift arrows to destination nodes?
     @warn "arrow_shift = :end will not display properly for 3D plots."
     nothing
@@ -139,7 +139,7 @@ function _inverse_interpolate(c::CurveTo{<:Point2}, p0, pt)
     poly5 = p0[1]^2 - 6*p0[1]*p1[1] + 6*p0[1]*p2[1] - 2*p0[1]*p3[1] + p0[2]^2 - 6*p0[2]*p1[2] + 6*p0[2]*p2[2] - 2*p0[2]*p3[2] + 9*p1[1]^2 - 18*p1[1]*p2[1] + 6*p1[1]*p3[1] + 9*p1[2]^2 - 18*p1[2]*p2[2] + 6*p1[2]*p3[2] + 9*p2[1]^2 - 6*p2[1]*p3[1] + 9*p2[2]^2 - 6*p2[2]*p3[2] + p3[1]^2 + p3[2]^2
     t_vals = roots5([poly0, poly1, poly2, poly3, poly4, poly5]) #get roots
     t_reals = filter(i -> isreal(i), round.(t_vals, digits=6)) #get reals (round to 6 digits)
-    return real.(t_reals)
+    return clamp.(real.(t_reals), 0.0, 1.0)
 end
 
 """
@@ -148,32 +148,40 @@ end
 Parametrize path `p` from `t ∈ [0, 1]`. Return tangent at `t`.
 """
 function tangent(p::BezierPath, t)
-    @assert p.commands[begin] isa MoveTo
-    N = length(p.commands) - 1
+    (p0, seg, tseg) = interpolation_startpoint_segmentid_offset(p, t)
 
-    tn = N*t
-    seg = max(0, min(floor(Int, tn), N-1))
-    tseg = tn - seg
-
-    p0 = p.commands[seg+1].p
     return _tangent(p.commands[seg+2], p0, tseg)
 end
 tangent(l::Line, _) = normalize(l.p - l.p0)
 
 """
-    discretize(path::AbstractPath)
+    discretize(path::AbstractPath, start_offset=0.0, end_offset=1.0)
 
 Return vector of points which represent the given `path`.
 """
-function discretize(path::BezierPath{T}) where {T}
+function discretize(path::BezierPath{T}, start_offset=0.0, end_offset=1.0) where {T}
     v = Vector{T}()
-    for c in path.commands
-        _discretize!(v, c)
+    push!(v, interpolate(path, start_offset))
+
+    p0, start_segment, start_segment_offset = interpolation_startpoint_segmentid_offset(path, start_offset)
+    _, end_segment, end_segment_offset = interpolation_startpoint_segmentid_offset(path, end_offset)
+
+    cropped_commands = path.commands[(start_segment+2):(end_segment+2)]
+
+    for (i, c) in enumerate(cropped_commands)
+        so = i==1 ? start_segment_offset : 0.0
+        eo = i==length(cropped_commands) ? end_segment_offset : 1.0
+        _discretize!(v, c, p0, so, eo)
+        p0 = c.p
     end
+
     return v
 end
 
-discretize(l::Line) = [l.p0, l.p]
+function discretize(l::Line, start_offset=0.0, end_offset=1.0)
+    dp = l.p - l.p0
+    return [l.p0 + start_offset*dp, l.p0 + end_offset*dp]
+end
 
 """
     _interpolate(c::PathCommand, p0, t)
@@ -198,19 +206,22 @@ function _tangent(c::CurveTo{PT}, p0, t) where PT
 end
 
 """
-    _discretize!(v::Vector{AbstractPint}, c::PathCommand)
+    _discretize!(v::Vector{AbstractPoint}, c::PathCommand)
 
 Append interpolated points of path `c` to pos vector `v`
 """
-_discretize!(v::Vector{<:AbstractPoint}, c::Union{MoveTo, LineTo}) = push!(v, c.p)
-function _discretize!(v::Vector{<:AbstractPoint}, c::CurveTo)
+function _discretize!(v::Vector{<:AbstractPoint}, c::LineTo, p0, _start_offset, end_offset)
+    push!(v, _interpolate(c, p0, end_offset))
+end
+function _discretize!(v::Vector{<:AbstractPoint}, c::CurveTo, p0, start_offset, end_offset)
+    # sometimes during initial layouts, the start and end can be swapped
+    start_offset > end_offset && return
     N0 = length(v)
-    p0 = v[end]
-    N = 60 # TODO: magic number of points for discretization
+    N = max(0, floor(Int, 60 * (end_offset-start_offset))+1) # TODO: magic number of points for discretization
     resize!(v, N0 + N)
-    dt = 1.0/N
-    for (i, t) in enumerate(dt:dt:1.0)
-        v[N0 + i] = _interpolate(c, p0, t)
+    for (i, t) in enumerate(range(start_offset, end_offset; length=N+1))
+        i==1 && continue #skip first point, already in vector
+        v[N0 + i-1] = _interpolate(c, p0, t)
     end
 end
 
