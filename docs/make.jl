@@ -11,6 +11,9 @@ using Graphs
 using RegistryInstances
 using NetworkLayout
 using StableRNGs
+# Load BonitoDocumenterExt before `makedocs` so FormatSelector methods are
+# visible in the current world age (WGLMakie → Bonito v5).
+using WGLMakie
 
 NetworkLayout.DEFAULT_RNG[] = StableRNG
 
