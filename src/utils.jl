@@ -261,31 +261,20 @@ the label in the middle of that gap.
 function compute_auto_label_aligns(g::AbstractGraph, node_positions::AbstractVector)
     n = nv(g)
     aligns = Vector{Tuple{Symbol, Symbol}}(undef, n)
-    
+
     for node in 1:n
         node_pos = node_positions[node]
         edge_angles = Float64[]
-        
-        # Collect angles of ALL incident edges (both incoming and outgoing)
-        # For incoming edges: direction FROM node TO source
-        # For outgoing edges: direction FROM node TO destination
-        for src in 1:n
-            if has_edge(g, src, node)  # Incoming edge
-                src_pos = node_positions[src]
-                dx = Float64(src_pos[1] - node_pos[1])
-                dy = Float64(src_pos[2] - node_pos[2])
-                push!(edge_angles, atan(dy, dx))
-            end
+
+        # One angle per distinct neighbour (Graphs.jl all_neighbors); skip self-loops.
+        for nbr in all_neighbors(g, node)
+            nbr == node && continue
+            nbr_pos = node_positions[nbr]
+            dx = Float64(nbr_pos[1] - node_pos[1])
+            dy = Float64(nbr_pos[2] - node_pos[2])
+            push!(edge_angles, atan(dy, dx))
         end
-        for dst in 1:n
-            if has_edge(g, node, dst)  # Outgoing edge
-                dst_pos = node_positions[dst]
-                dx = Float64(dst_pos[1] - node_pos[1])
-                dy = Float64(dst_pos[2] - node_pos[2])
-                push!(edge_angles, atan(dy, dx))
-            end
-        end
-        
+
         # Default alignment for isolated nodes
         if isempty(edge_angles)
             aligns[node] = (:right, :bottom)

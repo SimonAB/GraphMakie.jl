@@ -461,16 +461,8 @@ function Makie.plot!(gp::GraphPlot)
                 # Check each node to see if it's isolated
                 n = nv(graph)
                 for i in 1:n
-                    # Check if node has any incident edges
-                    has_edges = false
-                    for j in 1:n
-                        if has_edge(graph, i, j) || has_edge(graph, j, i)
-                            has_edges = true
-                            break
-                        end
-                    end
-                    # If isolated, use fallback alignment
-                    if !has_edges
+                    # Isolated nodes: fall back to user / default alignment
+                    if isempty(all_neighbors(graph, i))
                         auto_aligns[i] = getattr(fallback_align, i, dfth.nlabels_align[])
                     end
                 end
